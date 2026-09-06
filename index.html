@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5n 高速探索＆スナイパー Web</title>
+    <style>
+        body { font-family: sans-serif; background: #2f3136; color: #fff; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: #36393f; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        h2 { text-align: center; color: #7289da; margin-top: 0; }
+        label { display: block; margin: 12px 0 6px; font-weight: bold; color: #b9bbbe; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #202225; border-radius: 4px; background: #40444b; color: #fff; box-sizing: border-box; }
+        textarea { height: 100px; resize: vertical; }
+        button { width: 100%; padding: 12px; background: #7289da; color: #fff; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        button:hover { background: #677bc4; }
+        .log-box { margin-top: 20px; background: #2f3136; padding: 15px; border-radius: 4px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 13px; border: 1px solid #202225; }
+        .status-bar { display: flex; justify-content: space-between; margin-top: 10px; font-size: 14px; color: #b9bbbe; }
+        .success { color: #43b581; font-weight: bold; }
+        .danger { color: #f04747; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎯 5n 探索＆スナイパー Web</h2>
+    
+    <label>👤 ユーザートークン (USER_TOKEN)</label>
+    <input type="password" id="userToken" placeholder="MTU0NTgx...">
+
+    <label>🔒 有用プロキシ (http://user:pass@ip:port)</label>
+    <input type="text" id="proxyUrl" placeholder="http://31.59.20">
+    <small style="color:#7289da;">※ブラウザの仕様上、プロキシ経由の通信にはCORSプロキシ等の設定、または専用ブラウザ拡張機能が必要です。</small>
+
+    <label>📝 ターゲット（確認したい文字を改行区切りで入力）</label>
+    <textarea id="targetList" placeholder="00001&#13;00002&#13;abcde"></textarea>
+
+    <button id="startBtn" onclick="startSniper()">探索＆スナイプ開始 🚀</button>
+
+    <div class="status-bar">
+        <div>進捗: <span id="progress">0 / 0</span></div>
+        <div>プロキシ状態: <span id="proxyStatus" class="success">待機中</span></div>
+    </div>
+
+    <label>📊 リアルタイムログ</label>
+    <div id="logBox" class="log-box">ツールが起動しました。情報を入力して開始してください。</div>
+</div>
+
+<script>
+    let isRunning = false;
+
+    function addLog(message, type = '') {
+        const logBox = document.getElementById('logBox');
+        const timeStr = new Date().toLocaleTimeString();
+        let classAttr = '';
+        if(type === 'success') classAttr = 'class="success"';
+        if(type === 'danger') classAttr = 'class="danger"';
+        
+        logBox.innerHTML += `<br><span ${classAttr}>[${timeStr}] ${message}</span>`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function claimUsername(token, username) {
+        // 💡 取得可能だった場合、その場で即座にアカウントをその名前に変更するスナイパー機能
+        const url = "https://discord.com";
+        addLog(`⚡ 【スナイプ起動】${username} の自動取得を試みています...`, 'success');
+        
+        try {
+            const response = await fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username })
+            });
+            if (response.ok) {
+                addLog(`🎉 成功！！ユーザー名を「${username}」に変更しました！`, 'success');
+            } else {
+                addLog(`❌ スナイプ失敗 (ステータスコード: ${response.status})`, 'danger');
+            }
+        } catch (error) {
+            addLog(`⚠️ スナイプ通信エラー: ${error.message}`, 'danger');
+        }
+    }
+
+    async function startSniper() {
+        if(isRunning) return;
+        
+        const token = document.getElementById('userToken').value.trim();
+        const targetsText = document.getElementById('targetList').value.trim();
+        
+        if (!token || !targetsText) {
+            alert('トークンとターゲットを入力してください。');
+            return;
+        }
+
+        const targets = targetsText.split('\n').map(t => t.strip ? t.strip() : t.trim()).filter(t => t);
+        document.getElementById('progress').innerText = `0 / ${targets.length}`;
+        
+        isRunning = true;
+        document.getElementById('startBtn').innerText = '稼働中...';
+        addLog(`📋 探索を開始します。総ターゲット数: ${targets.length} 件`);
+
+        const checkUrl = "https://discord.com/pomelo";
+
+        for (let i = 0; i < targets.length; i++) {
+            const username = targets[i];
+            addLog(`🔍 ${username} をチェック中...`);
+            document.getElementById('progress').innerText = `${i + 1} / ${targets.length}`;
+
+            try {
+                // ブラウザから直接Discord APIへFetch通信を送る
+                const response = await fetch(checkUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: username })
+                });
+
+                if (response.status === 200) {
+                    const data = await response.json();
+                    if (data.taken === false) {
+                        addLog(`✨ 【取得可能】を発見: ${username}`, 'success');
+                        // 取得可能ならその場でスナイプ（アカウント変更）を実行
+                        await claimUsername(token, username);
+                    } else {
+                        addLog(`😥 取得不可能: ${username}`);
+                    }
+                } else if (response.status === 429) {
+                    addLog(`⚠️ レートリミット（429）を検知。5秒待機します。`, 'danger');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    i--; // 同じ文字を再試行
+                } else {
+                    addLog(`❌ エラーコード: ${response.status} (${username})`, 'danger');
+                }
+            } catch (error) {
+                addLog(`⚠️ 通信エラー: ${error.message}`, 'danger');
+            }
+
+            // 規制防止のため、1リクエストごとに3秒の安全ウエイト
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+
+        isRunning = false;
+        document.getElementById('startBtn').innerText = '探索＆スナイプ開始 🚀';
+        addLog('🏁 すべてのターゲットの探索が終了しました。');
+    }
+</script>
+
+</body>
+</html>
